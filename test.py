@@ -1,212 +1,57 @@
-import os
-import time
-from anthropic import Anthropic
-from dotenv import load_dotenv
 
-# =========================
-# LOAD ENV
-# =========================
-load_dotenv()
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-# =========================
-# EXTRACT TEXT
-# =========================
-def extract_text(response):
-    texts = []
-    for block in response.content:
-        if block.type == "text":
-            texts.append(block.text.strip())
-    return "\n".join(texts)
-
-# =========================
-# CLEAN EVIDENCE
-# =========================
-def clean_evidence(evidence):
-    cleaned = []
-
-    for line in evidence.split("\n"):
-        line = line.strip()
-
-        if not line:
-            continue
-        if "shutdown" in line.lower():
-            continue
-        if "unlevel" in line.lower():
-            continue
-        if "system" in line.lower():
-            continue
-        if len(line) < 10:
-            continue
-
-        cleaned.append(line)
-
-    return "\n".join(cleaned)
-
-# =========================
-# CLEAN SOURCES
-# =========================
-def clean_sources(text):
-    sources = []
-
-    if "Sources:" in text:
-        raw = text.split("Sources:")[-1].split("\n")
-
-        for s in raw:
-            s = s.strip()
-            if s.startswith("http"):
-                sources.append(s)
-
-    return "\n".join(sources) if sources else "No valid sources"
-
-# =========================
-# TOOL HANDLER WITH QUERY PRINT
-# =========================
-def call_with_tools(params):
-    response = client.messages.create(**params)
-
-    while True:
-        tool_calls = [b for b in response.content if b.type == "tool_use"]
-
-        if not tool_calls:
-            return response
-
-        print("\n================ TOOL DEBUG ================")
-
-        tool_results = []
-
-        for tool in tool_calls:
-            print(f"🌐 Tool Used: {tool.name}")
-
-            # 🔥 PRINT EXACT INTERNAL QUERY
-            if hasattr(tool, "input"):
-                print("🔎 Internal Search Query:")
-                print(tool.input)
-
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool.id,
-                "content": "Search executed"
-            })
-
-        print("===========================================")
-
-        response = client.messages.create(
-            model=params["model"],
-            max_tokens=params["max_tokens"],
-            messages=[
-                *params["messages"],
-                {"role": "assistant", "content": response.content},
-                {"role": "user", "content": tool_results}
-            ],
-            tools=params.get("tools", [])
-        )
-
-# =========================
-# SEARCH AGENT
-# =========================
-def search_evidence(part_name):
-
-    prompt = f"""
-Search for real-world observable failure symptoms of: {part_name}
-
-STRICT INSTRUCTIONS:
-- Use web search
-- Extract ONLY symptoms directly caused by THIS component
-- Ignore system-level effects (shutdown, unleveling, etc.)
-- Return clean bullet points (max 8)
-- No explanations
-
-Sources:
-- Include only valid full URLs
-- Remove broken links
-"""
-
-    params = {
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 400,
-        "tools": [{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 2
-        }],
-        "tool_choice": {"type": "tool", "name": "web_search"},
-        "messages": [{"role": "user", "content": prompt}]
-    }
-
-    response = call_with_tools(params)
-    raw_text = extract_text(response)
-
-    evidence = clean_evidence(raw_text)
-    sources = clean_sources(raw_text)
-
-    return evidence, sources
-
-# =========================
-# GENERATOR
-# =========================
-def generate_from_evidence(part_name, evidence):
-
-    prompt = f"""
-Part: {part_name}
-
-Evidence:
-{evidence}
-
-Task:
-Generate up to 5 observable failure symptoms.
-
-Rules:
-- ONLY use evidence
-- Ignore anything not specific to this component
-- No guessing
-- No extra text
-
-Output:
-1. ...
-2. ...
-"""
-
-    params = {
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 200,
-        "temperature": 0.2,
-        "messages": [{"role": "user", "content": prompt}]
-    }
-
-    response = client.messages.create(**params)
-    return extract_text(response)
-
-# =========================
-# RUN TEST
-# =========================
-def run_test(part_name):
-
-    print("\n==============================")
-    print(f"🔧 PART: {part_name}")
-    print("==============================")
-
-    # 🔎 SEARCH
-    evidence, sources = search_evidence(part_name)
-
-    print("\n📄 CLEANED EVIDENCE:\n")
-    print(evidence)
-
-    print("\n🔗 CLEAN SOURCES:\n")
-    print(sources)
-
-    time.sleep(2)
-
-    # ⚙️ GENERATE
-    symptoms = generate_from_evidence(part_name, evidence)
-
-    print("\n⚙️ GENERATED SYMPTOMS:\n")
-    print(symptoms)
-
-    print("\n==============================")
-
-# =========================
-# MAIN
-# =========================
-if __name__ == "__main__":
-    run_test("Elevator door motor")
+spare_parts = [
+    "Accumulator 12V/7Ah", 
+    "Shunt for door contact AZ01", 
+    "Belt for door drive, L=2700mm", 
+    "Toothed belt pulley Ø 130x61 Z49 (L&L)",
+    "Printed circuit board LONIBVE 2.Q", 
+    "Synchronisationsseil, PEGASUS DOOR", 
+    "Electric door brake", 
+    "Brake shoe lining", 
+    "Buffer for door lock", 
+    "Cable for door lock", 
+    "Cable for drive with controller",
+    "Encoder wires", 
+    "Guiding brush pulley", 
+    "W263, Brake disk 320x125x105mm", 
+    "Magnet GSd 115.07-98, 180V, 40%ED, lifting height 2x3mm",
+    "Neoprene 27BEC, seal with wire rope", 
+    "Belt coated steel Megalinear 30 P 3.3, L=300m", 
+    "Axial high-perf. fan HELIOS HRFW 200/4",
+    "Brake FMB130-C FCRD112, 185Nm/150Nm", 
+    "Seal set for cylinder LZA 120",
+    "Door lock ZTV50F left", 
+    "Kiekert, Motor GST50-12-084, 380V",
+    "Contact for door lock",
+    "Axle bearing assembly on the far left", 
+    "Motor for folding door, 230V AC, 50Hz, single-phase",
+    "Motor pulley D35", 
+    "Door motor, asynchronous, three phases, 240/415V AC, 50Hz", 
+    "Lower central bushing", 
+    "Latch cam type V25 205V DC 100%ED",
+    "Aritco, retiring cam STIN0006, old version with power supply", 
+    "Shunt TK6 (> 6010623)", 
+    "Oil collection container I7 H50 BFK 30", 
+    "Lift buffer HPM - 40 x 430 max. 2,5 m/s", 
+    "Buffer spacer Ø140x36mm, oval base plate 215x150mm",
+    "Pizzato, position switch FR 701-K15V17", 
+    "Inductive sensor SJ15-E, NO", 
+    "Bernstein, SM-actuator, IN and I88 series, metall plunger",
+    "Alarm push button station, d=40mm, 1NO, IP65", 
+    "Oil-drip tank for rail 5 mm", 
+    "Hydraulic Buffer V 16", 
+    "Pressure spring FL-DR 2/1,25X8,4X21 N=6 STA2K", 
+    "Door contact AZ02-1981",
+    "Rope for over speed governor 6mm, length = 31 m", 
+    "Remote tripping for Overspeedgovernor Gervall, 24VDC", 
+    "Over speed governor HJ200SBU, right, Ts=0.32m/s", 
+    "Seal kit for cylinder/jack 130 mm GMV",
+    "Moris, seal set for piston dia 110 mm (3-MAP)",
+    "Hydraulic block LRV175-1/175/251 complete",
+    "Motor oil M200 Vanguard Gearing EP150",
+    "Afriso, oil-water alarm unit ÖWU w/ wall rail oil-water probe",
+    "Lever for hand pump LVR EHP10",
+    "Brake modification kit AxienMOA115L/Dupar, 200V DC, 40%ED",
+    "Brake magnet Sassi 30B0, 195+224V, for gear LEO/MF48/MF58/GEKO",
+    "Conv. kit to dual-circuit brake for 11VT(R), 200V DC, 40%ED, long/short",
+    ]
