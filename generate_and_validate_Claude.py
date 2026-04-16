@@ -25,7 +25,7 @@ cursor.execute("SELECT id, spare_part FROM lift_parts WHERE description IS NULL"
 rows = cursor.fetchall()
 
 # =========================
-# GENERATOR (8–10 SYMPTOMS)
+# GENERATOR (LIFT BEHAVIOR SYMPTOMS)
 # =========================
 def generate_symptom(part):
 
@@ -35,20 +35,33 @@ You are an expert elevator fault diagnosis AI trained on real-world maintenance 
 Spare Part: {part}
 
 Task:
-Generate HIGH-QUALITY, REAL-WORLD observable failure symptoms caused by this component.
+Generate HIGH-QUALITY lift behavior symptoms caused by failure of this component.
 
 STRICT REQUIREMENTS:
 - Generate between 8 to 10 symptoms
-- Each symptom must reflect what a field technician can observe
+- Each symptom must describe how the LIFT behaves when this component fails
+- Focus on what a passenger or technician observes in lift operation
 - Must be directly attributable to this component failure
 - Must NOT be generic
 - Must NOT be vague
-- Avoid deep internal explanations unless observable
 
 CRITICAL:
-- Each symptom must be ONE clear technical sentence
+- Describe ONLY lift/system behavior
+- Do NOT describe internal component conditions (e.g., voltage, resistance, swelling)
+- Do NOT mention measurements or testing procedures
+- Do NOT describe physical damage of the component
+- Each symptom must be ONE clear sentence
 - No explanations
-- Output as numbered list
+
+Think in terms of:
+- Lift movement
+- Door behavior
+- Emergency operation
+- Control response
+- Passenger experience
+
+Output:
+Numbered list
 """
 
     response = client.messages.create(
@@ -64,7 +77,7 @@ CRITICAL:
 
 
 # =========================
-# VALIDATOR (STRICT PRECISION FILTER)
+# VALIDATOR (CAUSALITY-STRICT BEHAVIOR FILTER)
 # =========================
 def validate_symptom(part, symptom):
 
@@ -76,26 +89,31 @@ Generated Symptoms:
 {symptom}
 
 Task:
-Select ONLY the symptoms that are 100% correct.
+Select ONLY the symptoms that are 100% correct lift behaviors caused by failure of this specific component.
 
 ACCEPT ONLY IF:
-- Clearly and directly caused by this component failure
-- Observable in real-world elevator operation
-- Highly specific to this component
-- No ambiguity or assumption required
+- Clearly and directly caused by failure of THIS component
+- Observable in real-world elevator operation (passenger or technician perspective)
+- Strongly specific to this component (not common to multiple failures)
+- The symptom would NOT typically occur if this component were functioning correctly
+- Describes clear lift/system behavior (what the lift does)
 
 REJECT IF:
-- Even slightly generic
-- Indirect or weak causality
-- Could apply to multiple components
-- Requires interpretation or assumption
+- Could be caused by multiple different components (not unique to this part)
+- Generic lift issues (e.g., "lift not working", "door not opening")
+- Weak or indirect causality
+- Belongs to another subsystem (e.g., intercom, alarm, unrelated control systems)
+- Describes internal component condition (e.g., voltage, resistance, swelling)
+- Mentions measurements or testing procedures
+- Describes physical damage of the component
 
 CRITICAL:
-- Only include symptoms that are unquestionably correct
-- Do NOT try to fill a quota
-- It is completely acceptable to return any number of valid symptoms (including 0)
+- Be extremely strict about causality
+- Prefer fewer high-confidence symptoms over many weak ones
+- Only include symptoms that strongly indicate THIS component failure
+- It is acceptable to return any number of valid symptoms (including 0)
 
-🚨 HARD RULE:
+ HARD RULE:
 If you include ANY explanation, your answer is WRONG.
 
 You MUST ONLY return:
