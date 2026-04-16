@@ -9,12 +9,10 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS lift_parts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     spare_part TEXT NOT NULL,
+    extracted_text TEXT,
     description TEXT
 )
 """)
-
-
-
 
 spare_parts = [
     "Accumulator 12V/7Ah", 

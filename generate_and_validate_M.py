@@ -74,7 +74,7 @@ Example:
 """
 
     response = client.messages.create(
-        model="claude-sonnet-4.6",
+        model="claude-3-7-sonnet-latest",
         max_tokens=400,
         temperature=0.3,
 
