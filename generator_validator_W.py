@@ -45,74 +45,52 @@ def detect_source(response):
     return "MODEL"
 
 # =========================
-# CLEAN INCOMPLETE LINES (NEW)
-# =========================
-def clean_incomplete_lines(text):
-    lines = text.split("\n")
-    cleaned = []
-
-    for line in lines:
-        line = line.strip()
-
-        if not line:
-            continue
-
-        # keep only complete sentences
-        if not line.endswith((".", ")", "%")):
-            continue
-
-        cleaned.append(line)
-
-    return "\n".join(cleaned)
-
-# =========================
-# GENERATOR (FORCED WEB SEARCH)
+# GENERATOR (SMART WEB USAGE)
 # =========================
 def generate_symptom(part):
 
     prompt = f"""
-You are an expert elevator fault diagnosis AI using web search results.
+You are an expert elevator fault diagnosis AI.
 
 Spare Part: {part}
 
 Task:
 Generate real-world lift behavior symptoms caused by failure of this component.
 
-INSTRUCTIONS:
-- Use web search results to identify real-world failure behavior
-- Prefer:
-  • manufacturer documentation
-  • technical manuals
-  • maintenance guides
-  • real-world technician discussions
-- Ignore generic or low-quality sources
+IMPORTANT:
+- Use web search if the component is specific, uncommon, or not widely known
+- If you are not highly confident about the exact failure behavior, you MUST use web search
+- Do NOT assume based on similar components
+- Do NOT generalize from related parts
+- Prefer web search over guessing
+- If unsure, do not produce symptoms without grounding in real-world behavior
 
-REQUIREMENTS:
+STRICT REQUIREMENTS:
 - Generate 8 to 10 symptoms
 - Each symptom must describe how the LIFT behaves
 - Must be directly caused by this component failure
-- Must be observable in real-world operation
-- Must be specific and non-generic
-
-STRICTLY AVOID:
-- Internal component details (voltage, resistance, etc.)
-- Testing procedures
-- Physical damage descriptions
-- Generic elevator issues
+- Must NOT be generic or vague
 
 CRITICAL:
-- Each symptom must be ONE complete sentence
-- Do NOT leave incomplete sentences
+- Describe ONLY lift/system behavior
+- Do NOT describe internal component conditions
+- Do NOT mention voltage, resistance, testing, or measurements
+- Do NOT describe physical damage
+- Each symptom must be ONE sentence
+- Each symptom MUST be a COMPLETE sentence
+- Do NOT leave any sentence unfinished
+- Do NOT cut off mid-sentence
+- Ensure all points are fully written before ending
 - No explanations
 
 Output:
-Numbered list only
+Numbered list
 """
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=600,
-        temperature=0.3,   
+        max_tokens=700,
+        temperature=0.3,
 
         tools=[{
             "type": "web_search_20250305",
@@ -120,8 +98,7 @@ Numbered list only
             "max_uses": 1
         }],
 
-        # 🔥 FORCE WEB SEARCH
-        tool_choice={"type": "tool", "name": "web_search"},
+        tool_choice={"type": "auto"},
 
         messages=[
             {"role": "user", "content": prompt}
@@ -129,8 +106,6 @@ Numbered list only
     )
 
     text = extract_text(response)
-    text = clean_incomplete_lines(text)
-
     source = detect_source(response)
 
     return text, source
@@ -162,11 +137,12 @@ REJECT IF:
 - Generic lift issue
 - Weak or indirect causality
 - Rare or unrealistic scenario
-- Belongs to another subsystem
-- Mentions internal condition or testing
+- Belongs to another subsystem (intercom, alarm, etc.)
+- Mentions internal condition, measurement, or testing
 
 CRITICAL:
 - Prefer fewer high-confidence symptoms
+- Do NOT try to fill a quota
 - It is acceptable to return any number (including 0)
 
 🚨 HARD RULE:
